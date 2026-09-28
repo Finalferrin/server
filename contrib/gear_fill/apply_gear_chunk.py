@@ -136,8 +136,17 @@ def main():
 
     git("add", *files.values())
     print(git("diff", "--cached", "--stat").strip())
+
+    # Their checks, every time, on what was just staged. A failure here stops before anything is pushed.
+    check = subprocess.run([sys.executable, os.path.join(FORK, "contrib", "port_check.py"), "--staged"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+    print("\n" + check.stdout.strip())
+    if check.returncode != 0:
+        sys.exit("port_check failed: the chunk stays staged, fix it before committing")
+
     print(f"\nbranch {branch} from upstream/base, {len(ops)} rows staged. Write the commit message, then:")
     print(f"  git commit   (title under 72 characters, upstream's habit is a [sql] prefix)")
+    print(f"  python contrib/port_check.py   after the commit, so the message is checked too")
     print(f"  docker compose run --rm setup_database   then look at the items in the client")
     print(f"  git push -u origin {branch}   and open the pull request against LandSandBoat/server base")
 
