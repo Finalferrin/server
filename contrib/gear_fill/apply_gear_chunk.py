@@ -1,6 +1,9 @@
 """Put one gear chunk onto a branch off upstream base, in the upstream files' own order and style.
 
-    python contrib/gear_fill/apply_gear_chunk.py 001
+This file lives on branch gear-fill-chunks, which the fork leaves as soon as a chunk branch is made, so
+run it from the fork's folder by piping it out of git:
+
+    git show gear-fill-chunks:contrib/gear_fill/apply_gear_chunk.py | python - 001
 
 What it does, in order:
   1. refuses if the working tree is not clean; fetches upstream base
@@ -15,8 +18,10 @@ What it does, in order:
 """
 import csv, os, re, subprocess, sys, tempfile
 
-FORK = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+FORK = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8").stdout.strip()
 CHUNK_BRANCH = "gear-fill-chunks"
+if not FORK:
+    sys.exit("run this from inside the fork's folder")
 ROW = re.compile(r"^INSERT INTO `(item_mods|item_mods_pet|item_latents)` VALUES \(([^)]*)\);")
 
 def git(*args, check=True, capture=True):
@@ -138,7 +143,8 @@ def main():
     print(git("diff", "--cached", "--stat").strip())
 
     # Their checks, every time, on what was just staged. A failure here stops before anything is pushed.
-    check = subprocess.run([sys.executable, os.path.join(FORK, "contrib", "port_check.py"), "--staged"],
+    checker = git("show", f"{CHUNK_BRANCH}:contrib/port_check.py")
+    check = subprocess.run([sys.executable, "-", "--staged"], input=checker, cwd=FORK,
                            capture_output=True, text=True, encoding="utf-8", errors="replace")
     print("\n" + check.stdout.strip())
     if check.returncode != 0:
@@ -146,7 +152,7 @@ def main():
 
     print(f"\nbranch {branch} from upstream/base, {len(ops)} rows staged. Write the commit message, then:")
     print(f"  git commit   (title under 72 characters, upstream's habit is a [sql] prefix)")
-    print(f"  python contrib/port_check.py   after the commit, so the message is checked too")
+    print(f"  git show {CHUNK_BRANCH}:contrib/port_check.py | python -   after the commit, so the message is checked too")
     print(f"  docker compose run --rm setup_database   then look at the items in the client")
     print(f"  git push -u origin {branch}   and open the pull request against LandSandBoat/server base")
 

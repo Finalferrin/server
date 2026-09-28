@@ -1,7 +1,12 @@
 """Run LandSandBoat's own checks on what the current branch changes against upstream/base.
 
-    python contrib/port_check.py            checks the branch's diff against upstream/base
-    python contrib/port_check.py --staged   also includes staged, uncommitted changes (what apply_gear_chunk.py leaves)
+This file lives on branch gear-fill-chunks, which is never the branch under test, so run it from the
+fork's folder on any branch by piping it out of git:
+
+    git show gear-fill-chunks:contrib/port_check.py | python -            the branch's diff against upstream/base
+    git show gear-fill-chunks:contrib/port_check.py | python - --staged   also staged, uncommitted changes
+
+The fork is whichever repository the current folder is in.
 
 It runs, on the changed files only:
   - SQL:  the comment rule from tools/ci/sanity_checks/sql.sh  (no "--word", no "--- ")
@@ -12,8 +17,10 @@ Exit code 1 if anything fails, so it can gate a push. It changes no files.
 """
 import os, re, subprocess, sys
 
-FORK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FORK = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8").stdout.strip()
 BASE = "upstream/base"
+if not FORK:
+    sys.exit("run this from inside the fork's folder")
 
 def git(*args):
     return subprocess.run(["git", "-C", FORK, *args], capture_output=True, text=True, encoding="utf-8").stdout
